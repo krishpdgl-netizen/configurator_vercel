@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tender Reader — Panache DigiLife</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+.tender-layout { display: grid; grid-template-columns: 1fr 360px; min-height: calc(100dvh - 52px); }
+@media(max-width:960px){ .tender-layout { grid-template-columns:1fr; } .tender-sidebar { display:none; } }
+
+/* Upload zone */
+.upload-zone {
+  border: 1px dashed var(--rule-2); border-radius: var(--r-lg);
+  padding: 48px 32px; text-align: center; cursor: pointer;
+  transition: border-color .15s, background .15s; position: relative;
+}
+.upload-zone:hover,.upload-zone.drag { border-color: var(--trace); background: var(--trace-glow); }
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-icon { font-size: 40px; opacity: 0.25; margin-bottom: 12px; }
+.upload-title { font-family: var(--f-display); font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.upload-sub { font-size: 12px; color: var(--ink-3); }
+
+/* Progress tracker */
+.progress-track { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
+.progress-step {
+  display: flex; align-items: center; gap: 14px; padding: 12px 0;
+  border-left: 2px solid var(--rule); margin-left: 10px; padding-left: 18px; position: relative;
+}
+.progress-step:last-child { border-left-color: transparent; }
+.step-dot {
+  position: absolute; left: -7px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--surface-2); border: 2px solid var(--rule);
+  flex: 0 0 12px;
+}
+.step-dot.done { background: var(--signal); border-color: var(--signal); }
+.step-dot.active { background: var(--alert); border-color: var(--alert); animation: pulse 1.2s infinite; }
+.step-dot.error { background: var(--stop); border-color: var(--stop); }
+.step-label { font-family: var(--f-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.step-detail { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+
+/* Key points */
+.kp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media(max-width:700px){ .kp-grid { grid-template-columns:1fr; } }
+.kp-card {
+  background: var(--paper); border: var(--hair); border-radius: var(--r);
+  padding: 12px 14px;
+}
+.kp-label { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+.kp-value { font-size: 13px; font-weight: 500; }
+.kp-cite { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.page-badge {
+  font-family: var(--f-mono); font-size: 9px; background: var(--surface-3);
+  border: var(--hair); border-radius: 2px; padding: 2px 6px; color: var(--ink-3);
+}
+.kp-evidence { font-size: 11px; color: var(--ink-3); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
+/* Line items */
+.item-card {
+  border: var(--hair); border-radius: var(--r-lg);
+  margin-bottom: 12px; overflow: hidden;
+  background: var(--surface);
+}
+.item-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; cursor: pointer;
+  border-bottom: var(--hair);
+}
+.item-header:hover { background: var(--surface-2); }
+.item-num { font-family: var(--f-mono); font-size: 10px; color: var(--ink-3); flex: 0 0 24px; }
+.item-desc { font-weight: 600; font-size: 13px; flex: 1; }
+.item-qty { font-family: var(--f-mono); font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+.item-total { font-family: var(--f-mono); font-size: 13px; font-weight: 700; color: var(--trace); margin-left: auto; white-space: nowrap; }
+.item-body { padding: 14px 16px; }
+
+/* Build table */
+.build-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+.build-table th { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); padding: 6px 10px; border-bottom: var(--hair); text-align: left; }
+.build-table td { padding: 8px 10px; border-bottom: var(--hair); vertical-align: middle; }
+.build-table tr:last-child td { border-bottom: none; }
+.added-badge { font-family: var(--f-mono); font-size: 9px; background: rgba(201,139,94,0.1); color: var(--trace); border: 1px solid rgba(201,139,94,0.25); border-radius: 2px; padding: 1px 5px; white-space: nowrap; }
+.stock-ok { color: var(--signal); }
+.stock-warn { color: var(--alert); }
+
+/* Quotation sidebar */
+.tender-sidebar {
+  border-left: var(--hair); background: var(--paper);
+  position: sticky; top: 52px; height: calc(100dvh - 52px);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sidebar-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+.quote-line { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; font-size: 13px; border-bottom: var(--hair); }
+.quote-line:last-child { border-bottom: none; }
+.quote-label { color: var(--ink-2); font-size: 12px; }
+.quote-val { font-family: var(--f-mono); font-size: 12px; }
+.quote-total-line { display: flex; justify-content: space-between; padding: 12px 0 0; border-top: var(--hair); margin-top: 8px; }
+.quote-total-label { font-weight: 600; font-family: var(--f-display); }
+.quote-total-val { font-family: var(--f-mono); font-size: 20px; font-weight: 700; color: var(--trace); }
+.excluded-box { margin-top: 14px; padding: 10px 12px; border: 1px solid rgba(224,90,78,0.3); border-radius: var(--r); background: var(--stop-glow); }
+.excluded-label { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--stop); margin-bottom: 6px; }
+.excluded-item { font-size: 12px; color: var(--ink-2); padding: 2px 0; }
+
+/* Advisories */
+.advisory-list { display: flex; flex-direction: column; gap: 6px; }
+.advisory { padding: 9px 12px; border-radius: var(--r); border-left: 2px solid; font-size: 12px; }
+.advisory.warn { border-color: var(--alert); background: var(--alert-glow); }
+.advisory.info { border-color: var(--trace-dim); background: var(--trace-glow); }
+.advisory.block { border-color: var(--stop); background: var(--stop-glow); }
+.advisory-title { font-weight: 600; margin-bottom: 2px; }
+
+/* Group tabs */
+.group-tabs { display: flex; gap: 2px; border-bottom: var(--hair); margin-bottom: 20px; overflow-x: auto; }
+.group-tab {
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 8px 12px; cursor: pointer; color: var(--ink-3); white-space: nowrap;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.group-tab:hover { color: var(--ink-2); }
+.group-tab.active { color: var(--trace); border-bottom-color: var(--trace); }
+.group-panel { display: none; }
+.group-panel.active { display: block; }
+
+/* Section headings */
+.section-heading {
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-3); padding: 16px 0 8px; border-bottom: var(--hair); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+</style>
+</head>
+<body>
+<header class="masthead">
+  <a class="masthead-logo" href="/"><span class="via"></span><span>Panache DigiLife</span></a>
+  <nav class="masthead-nav">
+    <a href="/">Configure</a>
+    <a href="/admin">Admin</a>
+    <a href="/tender" class="active">Tender</a>
+  </nav>
+  <div class="masthead-right" id="tender-status-bar" style="display:none">
+    <span class="led pulse" id="status-led"></span>
+    <span class="silk" id="status-text">Processing…</span>
+  </div>
+</header>
+
+<div class="tender-layout" id="main-layout">
+
+  <!-- LEFT: upload + results -->
+  <div style="padding:24px;overflow-y:auto">
+
+    <!-- Upload panel (shown when no tender loaded) -->
+    <div id="upload-section">
+      <div class="toolbar" style="margin-bottom:20px">
+        <h1>Tender reader</h1>
+        <span class="tag tag-dim" style="font-size:10px">AI-assisted · deterministic pricing</span>
+      </div>
+
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" id="file-input" accept=".pdf,.docx,.doc">
+        <div class="upload-icon">📄</div>
+        <div class="upload-title">Drop a tender document here</div>
+        <div class="upload-sub">PDF or DOCX · GeM, CPP, or departmental format</div>
+        <div class="upload-sub" style="margin-top:4px">The AI extracts key points and cited evidence. Pricing is always arithmetic — the model never touches a cost.</div>
+      </div>
+
+      <div id="progress-section" style="display:none">
+        <div class="progress-track" id="progress-track"></div>
+        <div id="process-error" class="notice" style="display:none;margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- Results (shown after processing) -->
+    <div id="results-section" style="display:none">
+      <div class="toolbar" style="margin-bottom:20px">
+        <div>
+          <h1 id="r-title">Tender</h1>
+          <div class="text-ink3 mono" style="font-size:11px" id="r-meta"></div>
+        </div>
+        <button class="btn" onclick="reset()">← New tender</button>
+        <a class="btn btn-primary" id="export-link" href="#">Export .xlsx</a>
+      </div>
+
+      <!-- Group tabs: Key Points | Requirements | Advisories -->
+      <div class="group-tabs">
+        <div class="group-tab active" onclick="showGroup(this,'kp')">Key points</div>
+        <div class="group-tab" onclick="showGroup(this,'req')">Line items & builds</div>
+        <div class="group-tab" onclick="showGroup(this,'adv')">Advisories <span id="adv-badge" class="badge" style="margin-left:4px"></span></div>
+      </div>
+
+      <!-- Key points -->
+      <div class="group-panel active" id="group-kp">
+        <div id="kp-groups"></div>
+      </div>
+
+      <!-- Line items -->
+      <div class="group-panel" id="group-req">
+        <div id="items-list"></div>
+      </div>
+
+      <!-- Advisories -->
+      <div class="group-panel" id="group-adv">
+        <div id="adv-blocks" class="mb-16"></div>
+        <details id="adv-other-wrap" style="margin-top:8px">
+          <summary style="cursor:pointer;padding:10px 0;font-size:13px;color:var(--ink-2)" id="adv-other-label">0 additional advisories</summary>
+          <div id="adv-others" class="advisory-list" style="margin-top:10px"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: quotation sidebar -->
+  <aside class="tender-sidebar" id="tender-sidebar" style="display:none">
+    <div class="panel-header" style="flex:0 0 auto">
+      <h2>Budgetary quotation</h2>
+    </div>
+    <div class="sidebar-scroll">
+      <div class="silk silk-sm mb-8" id="q-ref"></div>
+      <div id="q-coverage" class="tag tag-dim mb-16" style="font-size:10px;display:inline-flex"></div>
+
+      <div id="q-lines"></div>
+
+      <div class="quote-total-line">
+        <span class="quote-total-label">Grand total</span>
+        <span class="quote-total-val" id="q-grand">—</span>
+      </div>
+      <div id="q-tax-line" class="text-ink3 mono" style="font-size:11px;text-align:right;margin-top:4px"></div>
+
+      <div id="q-excluded" class="excluded-box" style="display:none">
+        <div class="excluded-label">Excluded from total</div>
+        <div id="q-excluded-list"></div>
+      </div>
+
+      <div id="q-lead" class="availability" style="margin-top:16px"></div>
+
+      <div style="margin-top:20px;font-size:11px;color:var(--ink-3);line-height:1.6;border-top:var(--hair);padding-top:14px">
+        Budgetary estimate only — confirm stock, lead times and compliance before submitting. Items not in catalog are excluded. Prices include margin, excluding GST shown above.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const T = document.cookie.match(/admin_token=([^;]+)/)?.[1] || new URLSearchParams(location.search).get('token') || '';
+const api = (path, opts = {}) => fetch(path, { ...opts, headers: { 'x-admin-token': T, 'content-type': 'application/json', ...(opts.headers||{}) } });
+let fmtCurrency = null;
+let currentId = null;
+let pollTimer = null;
+
+// ---- Upload ----
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) upload(fileInput.files[0]); });
+
+async function upload(file) {
+  document.getElementById('progress-section').style.display = '';
+  setProgress([
+    { label: 'Uploading document', state: 'active', detail: file.name },
+    { label: 'Extracting text', state: '' },
+    { label: 'AI: commercial key points', state: '' },
+    { label: 'AI: technical line items', state: '' },
+    { label: 'Matching catalog', state: '' },
+    { label: 'Building quotation', state: '' },
+  ]);
+
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/api/tender/upload', { method: 'POST', headers: { 'x-admin-token': T }, body: form });
+  const r = await res.json();
+  if (!res.ok) { showError(r.error || 'Upload failed'); return; }
+
+  currentId = r.id;
+  document.getElementById('export-link').href = `/api/tender/${currentId}/export.xlsx`;
+  document.getElementById('tender-status-bar').style.display = '';
+  setStatusBar('active', 'Processing…');
+  pollTimer = setInterval(() => poll(currentId), 2000);
+}
+
+async function poll(id) {
+  const res = await api(`/api/tender/${id}`);
+  const r = await res.json();
+
+  const steps = [
+    { label: 'Uploading document', state: 'done', detail: r.filename },
+    { label: 'Extracting text', state: r.chars ? 'done' : (r.status === 'processing' ? 'active' : ''), detail: r.chars ? `${r.pages} pages · ${(r.chars/1000).toFixed(0)}k chars` : '' },
+    { label: 'AI: commercial key points', state: r.meta_json ? 'done' : (r.status === 'processing' ? 'active' : '') },
+    { label: 'AI: technical line items', state: r.items_json ? 'done' : (r.meta_json && r.status === 'processing' ? 'active' : '') },
+    { label: 'Matching catalog', state: r.match_json ? 'done' : (r.items_json && r.status === 'processing' ? 'active' : '') },
+    { label: 'Building quotation', state: r.status === 'done' ? 'done' : (r.match_json && r.status === 'processing' ? 'active' : '') },
+  ];
+  if (r.status === 'error') steps.forEach((s, i) => { if (s.state === 'active') steps[i].state = 'error'; });
+  setProgress(steps);
+
+  if (r.status === 'done') {
+    clearInterval(pollTimer);
+    setStatusBar('done', r.ref);
+    renderResults(r);
+  } else if (r.status === 'error') {
+    clearInterval(pollTimer);
+    setStatusBar('error', 'Processing failed');
+    showError(r.error || 'Unknown error');
+  }
+}
+
+function setProgress(steps) {
+  const track = document.getElementById('progress-track');
+  track.innerHTML = '';
+  for (const s of steps) {
+    const el = document.createElement('div');
+    el.className = 'progress-step';
+    el.innerHTML = `<span class="step-dot ${s.state}"></span>
+      <div><div class="step-label">${s.label}</div>${s.detail ? `<div class="step-detail">${s.detail}</div>` : ''}</div>`;
+    track.appendChild(el);
+  }
+}
+
+function setStatusBar(state, text) {
+  const led = document.getElementById('status-led');
+  led.className = 'led ' + (state === 'done' ? 'on' : state === 'error' ? 'stop' : 'warn pulse');
+  document.getElementById('status-text').textContent = text;
+}
+
+function showError(msg) {
+  const el = document.getElementById('process-error');
+  el.style.display = '';
+  el.textContent = '⚠ ' + msg;
+}
+
+function reset() {
+  clearInterval(pollTimer);
+  currentId = null;
+  document.getElementById('upload-section').style.display = '';
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('tender-sidebar').style.display = 'none';
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('process-error').style.display = 'none';
+  document.getElementById('tender-status-bar').style.display = 'none';
+  fileInput.value = '';
+}
+
+// ---- Results ----
+const GROUPS = {
+  Identification: ['tender_number','issuing_authority','tender_title'],
+  Dates: ['bid_deadline','prebid_date','opening_date','delivery_period'],
+  Commercial: ['tender_value','emd_amount','emd_exemption','pbg_pct','payment_terms','ld_penalty'],
+  Technical: ['warranty_years','sla'],
+  Eligibility: ['oem_criteria','certifications','make_in_india'],
+  Logistics: ['consignee_locations','installation_scope','training_scope'],
+  Risk: ['evaluation_method','risk_flags'],
+};
+
+function renderResults(r) {
+  fmtCurrency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('results-section').style.display = '';
+  document.getElementById('tender-sidebar').style.display = '';
+
+  const meta = r.meta_json || {};
+  const match = r.match_json || {};
+  const items = match.items || [];
+  const quot = match.quotation || {};
+
+  document.getElementById('r-title').textContent = meta.tender_title?.value || r.filename || 'Tender';
+  document.getElementById('r-meta').textContent = [
+    meta.tender_number?.value && ('Ref: ' + meta.tender_number.value),
+    meta.issuing_authority?.value,
+    r.pages && (r.pages + ' pages'),
+  ].filter(Boolean).join('  ·  ');
+
+  // Key points
+  const kpGroups = document.getElementById('kp-groups');
+  kpGroups.innerHTML = '';
+  for (const [group, keys] of Object.entries(GROUPS)) {
+    const fields = keys.map(k => ({ key: k, ...(meta[k] || {}) })).filter(f => f.value != null && f.value !== '');
+    if (!fields.length) continue;
+    const heading = document.createElement('div');
+    heading.className = 'section-heading';
+    heading.textContent = group;
+    kpGroups.appendChild(heading);
+    const grid = document.createElement('div');
+    grid.className = 'kp-grid';
+    for (const f of fields) {
+      const card = document.createElement('div');
+      card.className = 'kp-card';
+      if (f.low_confidence) card.innerHTML += '<span class="tag tag-alert" style="font-size:9px;margin-bottom:4px">Low confidence</span><br>';
+      card.innerHTML += `<div class="kp-label">${f.key.replace(/_/g,' ')}</div>
+        <div class="kp-value">${Array.isArray(f.value) ? f.value.join(', ') : f.value}</div>`;
+      if (f.page || f.evidence) {
+        card.innerHTML += `<div class="kp-cite">
+          ${f.page ? `<span class="page-badge">p.${f.page}</span>` : ''}
+          ${f.evidence ? `<span class="kp-evidence">${f.evidence}</span>` : ''}
+        </div>`;
+      }
+      grid.appendChild(card);
+    }
+    kpGroups.appendChild(grid);
+  }
+
+  // Advisories
+  const advisories = buildAdvisories(meta, items, quot);
+  const blocks = advisories.filter(a => a.level === 'block');
+  const others = advisories.filter(a => a.level !== 'block');
+  document.getElementById('adv-badge').textContent = advisories.length;
+  const blockEl = document.getElementById('adv-blocks');
+  blockEl.innerHTML = '';
+  for (const a of blocks) {
+    const d = document.createElement('div');
+    d.className = 'advisory block';
+    d.innerHTML = `<div class="advisory-title">${a.title}</div><div>${a.body}</div>`;
+    blockEl.appendChild(d);
+  }
+  const otherEl = document.getElementById('adv-others');
+  otherEl.innerHTML = '';
+  for (const a of others) {
+    const d = document.createElement('div');
+    d.className = 'advisory ' + a.level;
+    d.innerHTML = `<div class="advisory-title">${a.title}</div><div>${a.body}</div>`;
+    otherEl.appendChild(d);
+  }
+  document.getElementById('adv-other-label').textContent = `${others.length} additional advisories`;
+
+  // Line items
+  const itemsList = document.getElementById('items-list');
+  itemsList.innerHTML = '';
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    let statusTag = '';
+    if (!item.matched) statusTag = '<span class="tag tag-stop">Not in catalog</span>';
+    else if (item.conflict) statusTag = '<span class="tag tag-alert">No valid build</span>';
+    else statusTag = '<span class="tag tag-signal">Matched</span>';
+
+    card.innerHTML = `
+      <div class="item-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="item-num">${String(i+1).padStart(2,'0')}</span>
+        <div style="flex:1;min-width:0">
+          <div class="item-desc">${item.description}</div>
+          <div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap">
+            ${statusTag}
+            ${item.quantity ? `<span class="tag tag-dim">Qty: ${item.quantity} ${item.unit||''}</span>` : ''}
+            ${item.page ? `<span class="page-badge">p.${item.page}</span>` : ''}
+            ${item.low_confidence ? '<span class="tag tag-alert">Low confidence</span>' : ''}
+          </div>
+        </div>
+        ${item.subtotal ? `<span class="item-total">${fmtCurrency.format(item.subtotal)}</span>` : ''}
+      </div>`;
+
+    const body = document.createElement('div');
+    body.className = 'item-body';
+    body.style.display = 'none';
+
+    if (item.evidence) {
+      body.innerHTML += `<div class="text-ink3" style="font-size:12px;font-style:italic;margin-bottom:10px">"${item.evidence}"</div>`;
+    }
+
+    if (item.requirements && Object.keys(item.requirements).length) {
+      body.innerHTML += `<div class="kp-label" style="margin-bottom:6px">Requirements extracted</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          ${Object.entries(item.requirements).map(([k,v]) => `<span class="tag tag-dim">${k}: ${v}</span>`).join('')}
+        </div>`;
+    }
+
+    if (!item.matched) {
+      body.innerHTML += `<div class="notice" style="font-size:12px">This item does not match anything in the current catalog. It is excluded from the quotation total. Obtain a separate quote and add it manually.</div>`;
+    } else if (item.conflict) {
+      body.innerHTML += `<div class="notice notice-warn" style="font-size:12px">${item.note}</div>`;
+    } else if (item.build?.length) {
+      const addedCount = item.build.filter(b => b.added_by_us).length;
+      if (addedCount) {
+        body.innerHTML += `<div class="notice notice-warn" style="font-size:12px;margin-bottom:10px">${addedCount} part(s) marked "Added by us" were not in the tender specification but are required for a complete build. Confirm before bidding.</div>`;
+      }
+      body.innerHTML += `<table class="build-table">
+        <thead><tr><th>Category</th><th>Part</th><th>Qty</th><th>Unit price</th><th>Stock</th><th></th></tr></thead>
+        <tbody>${item.build.map(b => `
+          <tr>
+            <td class="silk" style="font-size:10px">${b.category_label}</td>
+            <td><strong style="font-size:12px">${b.name}</strong>${b.specs ? `<br><span class="text-ink3" style="font-size:11px">${b.specs}</span>` : ''}</td>
+            <td class="num">${b.qty}</td>
+            <td class="num text-trace">${fmtCurrency.format(b.unit_price)}</td>
+            <td class="${b.stock_qty > 0 ? 'stock-ok' : 'stock-warn'} mono" style="font-size:11px">${b.stock_qty > 0 ? b.stock_qty + ' in stock' : 'On order'}</td>
+            <td>${b.added_by_us ? '<span class="added-badge">Added by us</span>' : ''}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+      if (item.stock_issues?.length) {
+        body.innerHTML += `<div class="notice notice-warn" style="font-size:12px;margin-top:10px">Stock shortfall: ${item.stock_issues.join('; ')}</div>`;
+      }
+      if (item.lead_days) {
+        body.innerHTML += `<div class="availability" style="margin-top:10px"><span class="led ${item.lead_ok===false?'stop':item.lead_ok?'on':'warn'}"></span>Max lead time: ${item.lead_days} days ${item.lead_ok===false?'(exceeds delivery period)':''}</div>`;
+      }
+    }
+
+    card.innerHTML += body.outerHTML;
+    card.querySelector('.item-header').addEventListener('click', () => {
+      const b = card.querySelector('.item-body');
+      b.style.display = b.style.display === 'none' ? '' : 'none';
+    });
+    itemsList.appendChild(card);
+  }
+
+  // Sidebar quotation
+  renderQuotation(quot);
+}
+
+function renderQuotation(q) {
+  if (!q || !q.total) return;
+  document.getElementById('q-ref').textContent = 'Budgetary estimate';
+  document.getElementById('q-coverage').textContent = `${q.priced_items || 0} of ${q.total_items || 0} items priced`;
+
+  const lines = document.getElementById('q-lines');
+  lines.innerHTML = '';
+  // We don't have per-item breakdown here (it's in the items), just the totals
+  const sub = document.createElement('div');
+  sub.className = 'quote-line';
+  sub.innerHTML = `<span class="quote-label">Subtotal</span><span class="quote-val">${fmtCurrency.format(q.subtotal)}</span>`;
+  lines.appendChild(sub);
+
+  document.getElementById('q-grand').textContent = fmtCurrency.format(q.total);
+  document.getElementById('q-tax-line').textContent = `Incl. ${q.tax_label||'GST'} ${fmtCurrency.format(q.tax)}`;
+
+  const excl = q.unmatched_items || [];
+  const exclBox = document.getElementById('q-excluded');
+  if (excl.length) {
+    exclBox.style.display = '';
+    document.getElementById('q-excluded-list').innerHTML = excl.map(e => `<div class="excluded-item">• ${e}</div>`).join('');
+  } else {
+    exclBox.style.display = 'none';
+  }
+}
+
+function buildAdvisories(meta, items, quot) {
+  const adv = [];
+  // Blocking
+  if (items.some(i => i.matched && i.conflict)) {
+    adv.push({ level:'block', title:'One or more items have no valid build', body:'The catalog does not contain a legal combination for some requirements. Raise at the pre-bid meeting.' });
+  }
+  const unmatched = items.filter(i => !i.matched);
+  if (unmatched.length) {
+    adv.push({ level:'warn', title:`${unmatched.length} item(s) not in catalog`, body:'Excluded from the total: ' + unmatched.map(i=>i.description).join(', ') + '. Obtain separate quotes.' });
+  }
+  // Stock / lead time
+  const stockIssues = items.flatMap(i => i.stock_issues || []);
+  if (stockIssues.length) {
+    adv.push({ level:'warn', title:'Stock shortfalls', body:stockIssues.join('; ') });
+  }
+  const leadFail = items.filter(i => i.lead_ok === false);
+  if (leadFail.length) {
+    adv.push({ level:'block', title:'Lead time exceeds delivery period', body:leadFail.map(i=>i.description).join(', ') + ' — components may not arrive in time.' });
+  }
+  // EMD
+  if (meta.emd_amount?.value && !meta.emd_exemption?.value) {
+    adv.push({ level:'info', title:'EMD required', body:'Amount: ' + meta.emd_amount.value + '. No exemption noted. Verify MSME/startup eligibility.' });
+  }
+  // Low confidence fields
+  const lowConf = Object.entries(meta).filter(([,v]) => v?.low_confidence).map(([k]) => k.replace(/_/g,' '));
+  if (lowConf.length) {
+    adv.push({ level:'warn', title:'Low-confidence extractions', body:'Manually verify: ' + lowConf.join(', ') });
+  }
+  if (meta.risk_flags?.value?.length) {
+    adv.push({ level:'warn', title:'Risk flags noted', body: Array.isArray(meta.risk_flags.value) ? meta.risk_flags.value.join('; ') : meta.risk_flags.value });
+  }
+  if (meta.make_in_india?.value) {
+    adv.push({ level:'info', title:'Make in India clause', body: meta.make_in_india.value });
+  }
+  return adv;
+}
+
+function showGroup(btn, id) {
+  document.querySelectorAll('.group-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.group-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('group-' + id).classList.add('active');
+}
+
+// If ?id= in URL, load that tender directly
+const urlId = new URLSearchParams(location.search).get('id');
+if (urlId) {
+  currentId = urlId;
+  document.getElementById('progress-section').style.display = '';
+  document.getElementById('tender-status-bar').style.display = '';
+  setProgress([{ label: 'Loading tender', state: 'active' }]);
+  api('/api/tender/' + urlId).then(r => r.json()).then(r => {
+    if (r.status === 'done') {
+      setStatusBar('done', r.ref);
+      renderResults(r);
+    } else if (r.status === 'error') {
+      setStatusBar('error', 'Failed');
+      showError(r.error || 'Unknown error');
+    } else {
+      setStatusBar('active', 'Processing…');
+      pollTimer = setInterval(() => poll(urlId), 2000);
+    }
+  });
+}
+</script>
+</body>
+</html>

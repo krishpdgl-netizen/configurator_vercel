@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configure — Panache DigiLife</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+.layout { display: grid; grid-template-columns: 1fr 340px; gap: 0; min-height: calc(100dvh - 52px); }
+@media(max-width:900px){ .layout { grid-template-columns: 1fr; } .sidebar { position: static !important; } }
+
+/* Category ribbon */
+.ribbon {
+  position: sticky; top: 52px; z-index: 90;
+  background: rgba(8,11,16,0.94); backdrop-filter: blur(12px);
+  border-bottom: var(--hair);
+  padding: 0 20px;
+  display: flex; align-items: center; gap: 2px; overflow-x: auto;
+  height: 44px;
+}
+.ribbon::-webkit-scrollbar { height: 0; }
+.ribbon-item {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 5px 10px; border-radius: var(--r); cursor: pointer;
+  color: var(--ink-3); white-space: nowrap; text-decoration: none;
+  border: 1px solid transparent;
+}
+.ribbon-item:hover { color: var(--ink-2); }
+.ribbon-item.done { color: var(--signal); }
+.ribbon-item.required { color: var(--alert); }
+.ribbon-item.active { border-color: var(--rule); background: var(--surface); color: var(--ink); }
+
+/* Main catalog area */
+.catalog { padding: 24px 20px; }
+.cat-section { margin-bottom: 32px; scroll-margin-top: 100px; }
+.cat-header {
+  display: flex; align-items: baseline; gap: 12px;
+  margin-bottom: 14px; padding-bottom: 10px; border-bottom: var(--hair);
+}
+.cat-header h2 { font-size: 15px; }
+.options-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+
+.option-card {
+  position: relative;
+  border: var(--hair);
+  border-radius: var(--r);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+  background: var(--paper);
+  user-select: none;
+}
+.option-card:hover { border-color: var(--rule-2); background: var(--surface); }
+.option-card.selected { border-color: var(--trace); background: var(--surface); }
+.option-card.selected::before {
+  content: '';
+  position: absolute; top: -1px; left: -1px;
+  width: 12px; height: 12px;
+  background: var(--trace);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  border-radius: var(--r) 0 0 0;
+}
+.option-card.blocked { opacity: 0.45; cursor: not-allowed; border-color: rgba(224,90,78,0.2); }
+.option-card.blocked:hover { border-color: rgba(224,90,78,0.35); background: rgba(224,90,78,0.04); }
+.option-name { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+.option-specs { font-size: 12px; color: var(--ink-3); margin-bottom: 8px; line-height: 1.4; }
+.option-footer { display: flex; align-items: center; justify-content: space-between; }
+.option-price { font-family: var(--f-mono); font-weight: 700; font-size: 14px; color: var(--trace); }
+.option-stock { font-family: var(--f-mono); font-size: 10px; }
+.block-reason {
+  margin-top: 8px; padding: 6px 9px;
+  background: rgba(224,90,78,0.08); border-radius: 2px;
+  font-size: 11px; color: var(--stop); line-height: 1.4;
+}
+
+/* Sidebar / build sheet */
+.sidebar {
+  position: sticky; top: 52px; height: calc(100dvh - 52px);
+  display: flex; flex-direction: column;
+  border-left: var(--hair); background: var(--paper);
+  overflow: hidden;
+}
+.sidebar-header {
+  padding: 14px 16px 12px; border-bottom: var(--hair);
+  position: relative;
+}
+.sidebar-header::after {
+  content: ''; position: absolute; left: 16px; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, var(--trace) 0%, transparent 60%);
+}
+.build-items { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.build-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 0; border-bottom: var(--hair);
+}
+.build-item:last-child { border-bottom: none; }
+.build-item-info { flex: 1; min-width: 0; }
+.build-item-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.build-item-cat { font-family: var(--f-mono); font-size: 9px; color: var(--ink-3); letter-spacing: 0.08em; text-transform: uppercase; }
+.build-item-price { font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.remove-btn { background: none; border: none; color: var(--ink-3); padding: 2px 4px; font-size: 14px; cursor: pointer; flex: 0 0 auto; }
+.remove-btn:hover { color: var(--stop); }
+
+.build-totals {
+  border-top: var(--hair); padding: 14px 16px;
+  background: var(--paper);
+}
+.total-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; padding: 3px 0; }
+.total-row.grand { padding-top: 10px; border-top: var(--hair); margin-top: 6px; }
+.total-row.grand .label { color: var(--ink); font-weight: 600; font-family: var(--f-display); font-size: 14px; }
+.total-row.grand .val { font-family: var(--f-mono); font-size: 18px; font-weight: 700; color: var(--trace); }
+
+.warnings-box { margin: 10px 16px; }
+
+/* Enquiry form */
+.enquiry-form { padding: 12px 16px; border-top: var(--hair); }
+#enquiry-toggle { width: 100%; }
+.form-field { margin-bottom: 10px; }
+
+.empty-build {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; color: var(--ink-3); font-size: 13px;
+  text-align: center; padding: 24px;
+}
+.empty-build .icon { font-size: 32px; opacity: 0.3; }
+
+/* Qty controls */
+.qty-control { display: flex; align-items: center; gap: 6px; }
+.qty-btn { padding: 2px 7px; min-width: 24px; font-size: 13px; border-radius: 2px; }
+.qty-val { font-family: var(--f-mono); font-size: 12px; min-width: 20px; text-align: center; }
+
+/* Lead-time / stock strip */
+.availability {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--f-mono); font-size: 10px; color: var(--ink-3);
+  margin-top: 8px;
+}
+
+/* Units selector */
+.units-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: var(--hair); background: var(--surface); }
+.units-row label { font-family: var(--f-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.units-row input { width: 70px; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <a class="masthead-logo" href="/">
+    <span class="via"></span>
+    <span>Panache DigiLife</span>
+  </a>
+  <nav class="masthead-nav">
+    <a href="/" class="active">Configure</a>
+  </nav>
+  <div class="masthead-right">
+    <a class="silk" href="/login?next=/admin" style="color:var(--ink-3);text-decoration:none;font-size:10px">Staff ↗</a>
+  </div>
+</header>
+
+<div id="ribbon" class="ribbon"></div>
+
+<div class="layout">
+  <main class="catalog" id="catalog">
+    <div id="cat-sections"></div>
+    <div id="loading" style="padding:40px;text-align:center;color:var(--ink-3)">
+      <span class="silk">Loading catalog…</span>
+    </div>
+  </main>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="flex items-center gap-8">
+        <span class="silk">Build sheet</span>
+        <span class="led on" id="build-led"></span>
+      </div>
+    </div>
+
+    <div id="empty-build" class="empty-build">
+      <div class="icon">⬡</div>
+      <span>Select parts to begin</span>
+      <span class="silk silk-sm">choose one from each required category</span>
+    </div>
+
+    <div id="build-list" class="build-items hidden"></div>
+
+    <div class="units-row">
+      <label for="units-input">Units</label>
+      <input type="number" id="units-input" value="1" min="1" max="9999" style="width:70px">
+    </div>
+
+    <div id="warnings-box" class="warnings-box hidden"></div>
+
+    <div class="build-totals" id="build-totals" style="display:none">
+      <div class="total-row">
+        <span class="label text-ink3 silk silk-sm">Subtotal</span>
+        <span class="val num text-ink2" id="t-sub">—</span>
+      </div>
+      <div class="total-row">
+        <span class="label text-ink3 silk silk-sm" id="t-tax-label">Tax</span>
+        <span class="val num text-ink2" id="t-tax">—</span>
+      </div>
+      <div class="total-row grand">
+        <span class="label">Total</span>
+        <span class="val" id="t-total">—</span>
+      </div>
+      <div class="availability" id="avail-row"></div>
+    </div>
+
+    <div class="enquiry-form">
+      <button class="btn btn-primary w-full" id="enquiry-toggle" disabled>Submit enquiry</button>
+      <div id="enquiry-panel" class="hidden" style="margin-top:12px">
+        <div class="form-field">
+          <label class="silk silk-sm">Full name *</label>
+          <input type="text" id="eq-name" placeholder="Contact name">
+        </div>
+        <div class="form-field">
+          <label class="silk silk-sm">Company</label>
+          <input type="text" id="eq-company" placeholder="Organisation">
+        </div>
+        <div class="form-field">
+          <label class="silk silk-sm">Mobile *</label>
+          <input type="tel" id="eq-mobile" placeholder="+91 9999999999">
+        </div>
+        <div class="form-field">
+          <label class="silk silk-sm">Email</label>
+          <input type="email" id="eq-email" placeholder="you@company.com">
+        </div>
+        <div class="form-field">
+          <label class="silk silk-sm">City</label>
+          <input type="text" id="eq-city" placeholder="Mumbai">
+        </div>
+        <div class="form-field">
+          <label class="silk silk-sm">Notes</label>
+          <textarea id="eq-notes" rows="2" placeholder="Any specific requirements…"></textarea>
+        </div>
+        <button class="btn btn-primary w-full mt-8" id="eq-submit">Send enquiry</button>
+        <div id="eq-msg" style="margin-top:8px;font-size:12px;font-family:var(--f-mono)"></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script src="/rules.browser.js"></script>
+<script>
+let catalog = null;
+let rules = [];
+let selection = {}; // categoryId -> { option, qty }
+let fmt = null;
+
+async function load() {
+  const res = await fetch('/api/catalog');
+  catalog = await res.json();
+  rules = catalog.rules || [];
+  fmt = new Intl.NumberFormat(catalog.settings.locale || 'en-IN', { style: 'currency', currency: catalog.settings.currency || 'INR', maximumFractionDigits: 2 });
+  document.getElementById('loading').remove();
+  render();
+}
+
+function buildItems() {
+  return Object.values(selection).map(s => ({ option: s.option, qty: s.qty }));
+}
+
+function render() {
+  renderRibbon();
+  renderCatalog();
+  renderSidebar();
+}
+
+function renderRibbon() {
+  const r = document.getElementById('ribbon');
+  r.innerHTML = '';
+  for (const cat of catalog.categories) {
+    const sel = selection[cat.id];
+    const done = !!sel;
+    const req = Number(cat.required) && !done;
+    const a = document.createElement('a');
+    a.className = 'ribbon-item' + (done ? ' done' : '') + (req ? ' required' : '');
+    a.href = '#cat-' + cat.id;
+    a.innerHTML = `<span class="led ${done ? 'on' : (req ? 'warn' : '')}"></span>${cat.label}`;
+    r.appendChild(a);
+  }
+}
+
+function renderCatalog() {
+  const container = document.getElementById('cat-sections');
+  container.innerHTML = '';
+  const evalResult = RuleEngine.evaluate(rules, { items: buildItems() });
+
+  for (const cat of catalog.categories) {
+    const opts = catalog.options.filter(o => o.category_id === cat.id);
+    if (!opts.length) continue;
+
+    const sec = document.createElement('section');
+    sec.className = 'cat-section';
+    sec.id = 'cat-' + cat.id;
+
+    const selectedId = selection[cat.id]?.option?.id;
+    const hdr = document.createElement('div');
+    hdr.className = 'cat-header';
+    hdr.innerHTML = `<h2>${cat.label}</h2>
+      ${Number(cat.required) ? '<span class="tag tag-alert">Required</span>' : '<span class="tag tag-dim">Optional</span>'}
+      ${cat.note ? `<span class="text-ink3" style="font-size:12px">${cat.note}</span>` : ''}`;
+    sec.appendChild(hdr);
+
+    const grid = document.createElement('div');
+    grid.className = 'options-grid';
+
+    for (const opt of opts) {
+      // Check if adding this would block (only if not already selected)
+      let blockReason = null;
+      if (opt.id !== selectedId) {
+        const check = RuleEngine.checkAddition(rules, { items: buildItems() }, opt, cat);
+        if (!check.allowed) blockReason = check.reason;
+      }
+
+      const card = document.createElement('div');
+      card.className = 'option-card' +
+        (opt.id === selectedId ? ' selected' : '') +
+        (blockReason ? ' blocked' : '');
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', blockReason ? '-1' : '0');
+      card.setAttribute('aria-pressed', opt.id === selectedId ? 'true' : 'false');
+
+      const attrs = typeof opt.attrs === 'string' ? JSON.parse(opt.attrs || '{}') : (opt.attrs || {});
+      const attrList = Object.entries(attrs).slice(0, 4).map(([k,v]) => `${k}: ${v}`).join(' · ');
+
+      const stockLabel = opt.in_stock
+        ? `<span class="text-signal">${opt.stock_qty} in stock</span>`
+        : `<span class="text-alert">On order</span>`;
+
+      card.innerHTML = `
+        <div class="option-name">${opt.name}</div>
+        ${opt.specs ? `<div class="option-specs">${opt.specs}</div>` : ''}
+        ${attrList ? `<div class="option-specs" style="font-size:11px;opacity:.7">${attrList}</div>` : ''}
+        <div class="option-footer">
+          <span class="option-price">${fmt.format(opt.price)}</span>
+          <span class="option-stock silk">${stockLabel}</span>
+        </div>
+        ${blockReason ? `<div class="block-reason">${blockReason}</div>` : ''}
+      `;
+
+      if (!blockReason) {
+        const toggle = () => {
+          if (opt.id === selection[cat.id]?.option?.id) {
+            // deselect
+            delete selection[cat.id];
+          } else {
+            selection[cat.id] = { option: opt, qty: 1 };
+          }
+          render();
+          priceDebounced();
+        };
+        card.addEventListener('click', toggle);
+        card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+      }
+      grid.appendChild(card);
+    }
+    sec.appendChild(grid);
+    container.appendChild(sec);
+  }
+}
+
+function renderSidebar() {
+  const items = Object.values(selection);
+  const emptyEl = document.getElementById('empty-build');
+  const listEl = document.getElementById('build-list');
+  const totalsEl = document.getElementById('build-totals');
+  const led = document.getElementById('build-led');
+  const toggleBtn = document.getElementById('enquiry-toggle');
+
+  if (!items.length) {
+    emptyEl.classList.remove('hidden');
+    listEl.classList.add('hidden');
+    totalsEl.style.display = 'none';
+    toggleBtn.disabled = true;
+    led.className = 'led';
+    return;
+  }
+
+  emptyEl.classList.add('hidden');
+  listEl.classList.remove('hidden');
+  totalsEl.style.display = '';
+
+  const evalResult = RuleEngine.evaluate(rules, { items: buildItems() });
+  const missingRequired = catalog.categories
+    .filter(c => Number(c.required) && !selection[c.id]);
+  const canSubmit = evalResult.ok && !missingRequired.length;
+
+  toggleBtn.disabled = !canSubmit;
+  led.className = 'led ' + (canSubmit ? 'on' : (evalResult.blocks.length ? 'stop' : 'warn'));
+
+  // Warnings
+  const wBox = document.getElementById('warnings-box');
+  if (evalResult.blocks.length || evalResult.warns.length || missingRequired.length) {
+    wBox.classList.remove('hidden');
+    wBox.innerHTML = '';
+    for (const b of evalResult.blocks) {
+      const d = document.createElement('div');
+      d.className = 'notice'; d.style.marginBottom = '6px';
+      d.innerHTML = `<span class="tag tag-stop">Block</span> <span style="font-size:12px;margin-left:6px">${b.message}</span>`;
+      wBox.appendChild(d);
+    }
+    for (const m of missingRequired) {
+      const d = document.createElement('div');
+      d.className = 'notice notice-warn'; d.style.marginBottom = '6px';
+      d.innerHTML = `<span class="silk silk-sm">Required</span> <span style="font-size:12px;margin-left:6px">${m.label} not selected</span>`;
+      wBox.appendChild(d);
+    }
+    for (const w of evalResult.warns) {
+      const d = document.createElement('div');
+      d.className = 'notice notice-warn'; d.style.marginBottom = '6px';
+      d.innerHTML = `<span class="tag tag-alert">Warn</span> <span style="font-size:12px;margin-left:6px">${w.message}</span>`;
+      wBox.appendChild(d);
+    }
+  } else {
+    wBox.classList.add('hidden');
+  }
+
+  // Build list
+  listEl.innerHTML = '';
+  for (const [catId, { option: opt, qty }] of Object.entries(selection)) {
+    const cat = catalog.categories.find(c => c.id === catId);
+    const item = document.createElement('div');
+    item.className = 'build-item';
+    const price = fmt.format(opt.price * qty);
+    item.innerHTML = `
+      <div class="build-item-info">
+        <div class="build-item-cat">${cat?.label || catId}</div>
+        <div class="build-item-name">${opt.name}</div>
+        ${Number(cat?.multi) ? `
+          <div class="qty-control mt-8">
+            <button class="btn qty-btn" onclick="changeQty('${catId}',-1)">−</button>
+            <span class="qty-val">${qty}</span>
+            <button class="btn qty-btn" onclick="changeQty('${catId}',1)">+</button>
+          </div>` : ''}
+      </div>
+      <div style="text-align:right;flex:0 0 auto">
+        <div class="build-item-price">${price}</div>
+        <button class="remove-btn" onclick="removeItem('${catId}')" title="Remove">×</button>
+      </div>`;
+    listEl.appendChild(item);
+  }
+}
+
+function changeQty(catId, delta) {
+  if (!selection[catId]) return;
+  const newQty = Math.max(1, selection[catId].qty + delta);
+  const cat = catalog.categories.find(c => c.id === catId);
+  if (newQty > (cat?.max_qty || 1)) return;
+  selection[catId].qty = newQty;
+  render();
+  priceDebounced();
+}
+
+function removeItem(catId) {
+  delete selection[catId];
+  render();
+  priceDebounced();
+}
+
+let priceTimer = null;
+function priceDebounced() {
+  clearTimeout(priceTimer);
+  priceTimer = setTimeout(fetchPrice, 200);
+}
+
+async function fetchPrice() {
+  const items = Object.values(selection).map(s => ({ option_id: s.option.id, qty: s.qty }));
+  if (!items.length) return;
+  const units = Number(document.getElementById('units-input').value) || 1;
+  const res = await fetch('/api/price', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ selection: items, units }) });
+  const q = await res.json();
+  const s = catalog.settings;
+  document.getElementById('t-sub').textContent = fmt.format(q.subtotal);
+  document.getElementById('t-tax-label').textContent = s.tax_label || 'Tax';
+  document.getElementById('t-tax').textContent = fmt.format(q.tax);
+  document.getElementById('t-total').textContent = fmt.format(q.total);
+
+  const avail = document.getElementById('avail-row');
+  const maxLead = q.items?.reduce((m, i) => Math.max(m, Number(i.lead_days) || 0), 0) || 0;
+  const allStock = q.items?.every(i => i.in_stock !== false);
+  avail.innerHTML = maxLead
+    ? `<span class="led ${allStock ? 'on' : 'warn'}"></span> Lead time: ${maxLead} days`
+    : `<span class="led on"></span> All in stock`;
+}
+
+// Enquiry
+document.getElementById('enquiry-toggle').addEventListener('click', () => {
+  const p = document.getElementById('enquiry-panel');
+  p.classList.toggle('hidden');
+  if (!p.classList.contains('hidden')) document.getElementById('eq-name').focus();
+});
+
+document.getElementById('eq-submit').addEventListener('click', async () => {
+  const msg = document.getElementById('eq-msg');
+  msg.textContent = '';
+  const name = document.getElementById('eq-name').value.trim();
+  const mobile = document.getElementById('eq-mobile').value.trim();
+  const email = document.getElementById('eq-email').value.trim();
+  if (!name || (!mobile && !email)) {
+    msg.style.color = 'var(--stop)';
+    msg.textContent = 'Name and mobile or email are required.';
+    return;
+  }
+  const items = Object.values(selection).map(s => ({ option_id: s.option.id, qty: s.qty }));
+  const units = Number(document.getElementById('units-input').value) || 1;
+  document.getElementById('eq-submit').disabled = true;
+  msg.style.color = 'var(--ink-3)';
+  msg.textContent = 'Sending…';
+  try {
+    const res = await fetch('/api/enquiry', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, company: document.getElementById('eq-company').value.trim(), mobile, email, city: document.getElementById('eq-city').value.trim(), notes: document.getElementById('eq-notes').value.trim(), units, selection: items }) });
+    const r = await res.json();
+    if (r.ok) {
+      msg.style.color = 'var(--signal)';
+      msg.textContent = `Enquiry submitted — ref ${r.ref}`;
+    } else {
+      msg.style.color = 'var(--stop)';
+      msg.textContent = r.error || 'Something went wrong.';
+    }
+  } finally {
+    document.getElementById('eq-submit').disabled = false;
+  }
+});
+
+document.getElementById('units-input').addEventListener('input', priceDebounced);
+
+// Scroll-spy ribbon active state
+const io = new IntersectionObserver(entries => {
+  for (const e of entries) {
+    if (e.isIntersecting) {
+      const id = e.target.id.replace('cat-', '');
+      document.querySelectorAll('.ribbon-item').forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#cat-' + id);
+      });
+    }
+  }
+}, { rootMargin: '-100px 0px -60% 0px' });
+
+load().then(() => {
+  document.querySelectorAll('.cat-section').forEach(s => io.observe(s));
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Panache DigiLife</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+.layout { display: flex; min-height: calc(100dvh - 52px); }
+.sidebar-nav {
+  width: 190px; flex: 0 0 190px;
+  border-right: var(--hair); background: var(--paper);
+  padding: 16px 0; position: sticky; top: 52px; height: calc(100dvh - 52px); overflow-y: auto;
+}
+.nav-section { margin-bottom: 20px; }
+.nav-label { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); padding: 4px 16px 8px; }
+.nav-link {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--ink-2); text-decoration: none;
+  padding: 8px 16px; cursor: pointer; border: none; background: none; width: 100%;
+  text-align: left;
+}
+.nav-link:hover { color: var(--ink); background: var(--surface); }
+.nav-link.active { color: var(--trace); background: var(--trace-glow); border-right: 2px solid var(--trace); }
+.nav-link .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: 0 0 5px; }
+
+.main { flex: 1; min-width: 0; padding: 24px; }
+
+/* Tab panes */
+.pane { display: none; }
+.pane.active { display: block; }
+
+/* Toolbar */
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.toolbar h1 { font-size: 18px; }
+
+/* Options grid within admin */
+.admin-table-wrap { overflow-x: auto; border: var(--hair); border-radius: var(--r-lg); }
+
+/* Inline form */
+.inline-form {
+  background: var(--surface); border: var(--hair); border-radius: var(--r-lg);
+  padding: 20px; margin-bottom: 20px;
+}
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-family: var(--f-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+.form-actions { margin-top: 14px; display: flex; gap: 8px; align-items: center; }
+#form-msg { font-family: var(--f-mono); font-size: 12px; }
+
+/* Excel section */
+.excel-zone {
+  border: 1px dashed var(--rule-2); border-radius: var(--r-lg);
+  padding: 32px; text-align: center; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.excel-zone:hover, .excel-zone.dragover { border-color: var(--trace); background: var(--trace-glow); }
+.excel-zone input { position: absolute; width: 0; height: 0; opacity: 0; }
+
+/* Settings pairs */
+.settings-grid { display: grid; grid-template-columns: 200px 1fr; gap: 12px; align-items: center; }
+
+/* Rules form */
+.rule-card {
+  border: var(--hair); border-radius: var(--r); margin-bottom: 8px;
+  background: var(--paper); overflow: hidden;
+}
+.rule-card-header {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer;
+}
+.rule-card-body { padding: 12px 14px; border-top: var(--hair); display: none; }
+.rule-card.open .rule-card-body { display: block; }
+.rule-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Rule tester */
+#tester-build .option-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+#tester-results .result-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: var(--hair); font-size: 12px; }
+#tester-results .result-row:last-child { border-bottom: none; }
+.result-detail { font-family: var(--f-mono); font-size: 11px; color: var(--ink-3); }
+
+/* Leads */
+.lead-row td:first-child { font-family: var(--f-mono); font-size: 11px; }
+
+/* Count badge */
+.badge {
+  font-family: var(--f-mono); font-size: 10px; background: var(--surface-3);
+  border: var(--hair); border-radius: 10px; padding: 1px 7px;
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <a class="masthead-logo" href="/">
+    <span class="via"></span>
+    <span>Panache DigiLife</span>
+  </a>
+  <nav class="masthead-nav">
+    <a href="/">Configure</a>
+    <a href="/admin" class="active">Admin</a>
+    <a href="/tender">Tender</a>
+  </nav>
+  <div class="masthead-right">
+    <span class="led on"></span>
+    <span class="silk" id="admin-status">Connected</span>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar-nav">
+    <div class="nav-section">
+      <div class="nav-label">Catalog</div>
+      <button class="nav-link active" data-pane="parts" onclick="showPane(this,'parts')"><span class="dot"></span>Parts</button>
+      <button class="nav-link" data-pane="categories" onclick="showPane(this,'categories')"><span class="dot"></span>Categories</button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Rules</div>
+      <button class="nav-link" data-pane="rules" onclick="showPane(this,'rules')"><span class="dot"></span>Compatibility rules</button>
+      <button class="nav-link" data-pane="tester" onclick="showPane(this,'tester')"><span class="dot"></span>Rule tester</button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Data</div>
+      <button class="nav-link" data-pane="excel" onclick="showPane(this,'excel')"><span class="dot"></span>Excel import/export</button>
+      <button class="nav-link" data-pane="fields" onclick="showPane(this,'fields')"><span class="dot"></span>Extraction fields</button>
+      <button class="nav-link" data-pane="settings" onclick="showPane(this,'settings')"><span class="dot"></span>Settings</button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Activity</div>
+      <button class="nav-link" data-pane="leads" onclick="showPane(this,'leads')"><span class="dot"></span>Leads</button>
+      <button class="nav-link" data-pane="tenders-list" onclick="showPane(this,'tenders-list')"><span class="dot"></span>Tenders</button>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- PARTS -->
+    <div class="pane active" id="pane-parts">
+      <div class="toolbar">
+        <h1>Parts</h1>
+        <button class="btn btn-primary" onclick="showPartForm(null)">+ Add part</button>
+        <span class="badge" id="parts-count">0</span>
+        <label style="display:flex;align-items:center;gap:6px;margin-left:8px">
+          <input type="checkbox" id="show-inactive" onchange="renderParts()">
+          <span class="silk silk-sm">Show retired</span>
+        </label>
+      </div>
+      <div id="part-form-wrap" class="hidden">
+        <div class="inline-form">
+          <div class="form-grid" id="part-form-fields"></div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="savePart()">Save part</button>
+            <button class="btn" onclick="closePartForm()">Cancel</button>
+            <span id="form-msg"></span>
+          </div>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table id="parts-table">
+          <thead><tr>
+            <th>ID</th><th>Name</th><th>Category</th><th>Landed cost</th><th>Sell price</th>
+            <th>Stock</th><th>Lead</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="parts-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CATEGORIES -->
+    <div class="pane" id="pane-categories">
+      <div class="toolbar">
+        <h1>Categories</h1>
+        <button class="btn btn-primary" onclick="showCatForm(null)">+ Add category</button>
+      </div>
+      <div id="cat-form-wrap" class="hidden">
+        <div class="inline-form">
+          <div class="form-grid">
+            <div class="form-group"><label>ID (slug)</label><input id="cf-id"></div>
+            <div class="form-group"><label>Label</label><input id="cf-label"></div>
+            <div class="form-group"><label>Note</label><input id="cf-note"></div>
+            <div class="form-group"><label>Sort order</label><input id="cf-sort" type="number" value="0"></div>
+            <div class="form-group"><label>Required</label><select id="cf-required"><option value="0">No</option><option value="1">Yes</option></select></div>
+            <div class="form-group"><label>Max qty</label><input id="cf-max-qty" type="number" value="1"></div>
+            <div class="form-group"><label>Multi-select</label><select id="cf-multi"><option value="0">No</option><option value="1">Yes</option></select></div>
+            <div class="form-group"><label>Margin % (blank = default)</label><input id="cf-margin" placeholder="leave blank to use default"></div>
+            <div class="form-group"><label>Active</label><select id="cf-active"><option value="1">Yes</option><option value="0">No</option></select></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveCat()">Save</button>
+            <button class="btn" onclick="document.getElementById('cat-form-wrap').classList.add('hidden')">Cancel</button>
+            <span id="cat-form-msg" style="font-family:var(--f-mono);font-size:12px"></span>
+          </div>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table><thead><tr><th>ID</th><th>Label</th><th>Required</th><th>Multi</th><th>Margin %</th><th>Active</th><th></th></tr></thead>
+        <tbody id="cats-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- RULES -->
+    <div class="pane" id="pane-rules">
+      <div class="toolbar">
+        <h1>Compatibility rules</h1>
+        <button class="btn btn-primary" onclick="showRuleForm(null)">+ Add rule</button>
+        <button class="btn" onclick="loadStarterPack()">Load starter pack</button>
+      </div>
+      <div id="rule-form-wrap" class="hidden">
+        <div class="inline-form">
+          <div class="rule-form-grid">
+            <div class="form-group"><label>Name (unique slug)</label><input id="rf-name"></div>
+            <div class="form-group"><label>Severity</label><select id="rf-severity"><option>block</option><option>warn</option></select></div>
+            <div class="form-group" style="grid-column:1/-1"><label>Customer-facing message</label><input id="rf-message" placeholder="This CPU does not fit the selected motherboard socket."></div>
+            <div class="form-group"><label>Left kind</label><select id="rf-lk"><option value="">—</option><option>sum</option><option>max</option><option>min</option><option>count</option><option>value</option><option>const</option><option>expr</option></select></div>
+            <div class="form-group"><label>Left categories (comma list)</label><input id="rf-lc" placeholder="cpu,gpu"></div>
+            <div class="form-group"><label>Left attr</label><input id="rf-la" placeholder="socket"></div>
+            <div class="form-group"><label>Left scale</label><input id="rf-ls" placeholder="1.25"></div>
+            <div class="form-group"><label>Left offset</label><input id="rf-lo" placeholder="110"></div>
+            <div class="form-group"><label>Operator</label><select id="rf-op"><option value="">—</option><option>eq</option><option>neq</option><option>lt</option><option>lte</option><option>gt</option><option>gte</option><option>in</option><option>nin</option><option>subset</option></select></div>
+            <div class="form-group"><label>Right kind</label><select id="rf-rk"><option value="">—</option><option>sum</option><option>max</option><option>min</option><option>count</option><option>value</option><option>const</option><option>expr</option></select></div>
+            <div class="form-group"><label>Right categories</label><input id="rf-rc"></div>
+            <div class="form-group"><label>Right attr</label><input id="rf-ra"></div>
+            <div class="form-group"><label>Right const</label><input id="rf-rv" placeholder="2 or a,b,c"></div>
+            <div class="form-group"><label>Enabled</label><select id="rf-en"><option value="1">Yes</option><option value="0">No</option></select></div>
+            <div class="form-group"><label>Sort</label><input id="rf-sort" type="number" value="0"></div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveRule()">Save rule</button>
+            <button class="btn" onclick="closeRuleForm()">Cancel</button>
+            <span id="rule-form-msg" style="font-family:var(--f-mono);font-size:12px"></span>
+          </div>
+        </div>
+      </div>
+      <div id="rules-list"></div>
+    </div>
+
+    <!-- RULE TESTER -->
+    <div class="pane" id="pane-tester">
+      <div class="toolbar"><h1>Rule tester</h1></div>
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-header"><h2>Build</h2><span class="text-ink3" style="font-size:12px">Select options to test against all rules</span></div>
+        <div class="panel-body">
+          <div id="tester-build"></div>
+          <button class="btn btn-primary mt-16" onclick="runTest()">Run rules</button>
+        </div>
+      </div>
+      <div class="panel" id="test-results-panel" style="display:none">
+        <div class="panel-header"><h2>Results</h2><span id="test-summary" class="badge" style="margin-left:8px"></span></div>
+        <div class="panel-body"><div id="tester-results"></div></div>
+      </div>
+    </div>
+
+    <!-- EXCEL -->
+    <div class="pane" id="pane-excel">
+      <div class="toolbar"><h1>Excel import / export</h1></div>
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-header"><h2>Export current catalog</h2></div>
+        <div class="panel-body">
+          <p class="text-ink2" style="font-size:13px;margin-bottom:14px">Download the full catalog — categories, options, rules, extraction fields and settings — as one Excel workbook. Edit and upload it back.</p>
+          <a class="btn btn-primary" href="/api/admin/export.xlsx">Download catalog.xlsx</a>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h2>Import</h2></div>
+        <div class="panel-body">
+          <div class="notice notice-warn" style="margin-bottom:14px;font-size:12px">
+            Rows are matched on <code>id</code>. Nothing is ever deleted. Retire a part with <code>active = 0</code>.
+            A single bad row rejects the whole file — nothing is changed.
+          </div>
+          <div class="excel-zone" id="drop-zone">
+            <input type="file" id="excel-file" accept=".xlsx">
+            <div style="font-size:32px;margin-bottom:8px;opacity:0.3">⬆</div>
+            <div class="silk">Drop an Excel file here or click to browse</div>
+            <div class="text-ink3" style="font-size:12px;margin-top:4px">catalog.xlsx from the export above</div>
+          </div>
+          <div id="import-msg" style="margin-top:14px;font-family:var(--f-mono);font-size:12px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXTRACTION FIELDS -->
+    <div class="pane" id="pane-fields">
+      <div class="toolbar"><h1>Extraction fields</h1></div>
+      <div class="admin-table-wrap">
+        <table><thead><tr><th>Key</th><th>Label</th><th>Group</th><th>Type</th><th>Hint</th><th>Active</th></tr></thead>
+        <tbody id="fields-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="pane" id="pane-settings">
+      <div class="toolbar"><h1>Settings</h1></div>
+      <div class="panel">
+        <div class="panel-body">
+          <div id="settings-form" class="settings-grid"></div>
+          <div style="margin-top:18px;display:flex;gap:10px;align-items:center">
+            <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+            <span id="settings-msg" style="font-family:var(--f-mono);font-size:12px"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEADS -->
+    <div class="pane" id="pane-leads">
+      <div class="toolbar"><h1>Leads</h1><span class="badge" id="leads-count">0</span></div>
+      <div class="admin-table-wrap">
+        <table><thead><tr><th>Ref</th><th>Name</th><th>Company</th><th>Mobile</th><th>City</th><th>Units</th><th>Total</th><th>Created</th></tr></thead>
+        <tbody id="leads-tbody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- TENDERS LIST -->
+    <div class="pane" id="pane-tenders-list">
+      <div class="toolbar"><h1>Tenders</h1></div>
+      <div class="admin-table-wrap">
+        <table><thead><tr><th>Ref</th><th>Filename</th><th>Pages</th><th>Status</th><th>Created</th><th></th></tr></thead>
+        <tbody id="tenders-tbody"></tbody></table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="/rules.browser.js"></script>
+<script>
+const T = document.cookie.match(/admin_token=([^;]+)/)?.[1] || new URLSearchParams(location.search).get('token') || '';
+const api = async (path, opts = {}) => {
+  const res = await fetch(path, { ...opts, headers: { 'x-admin-token': T, 'content-type': 'application/json', ...(opts.headers || {}) } });
+  return res;
+};
+
+let adminData = null;
+let editingPartId = null;
+let editingCatId = null;
+let editingRuleId = null;
+
+async function loadAll() {
+  const res = await api('/api/admin/catalog');
+  adminData = await res.json();
+  renderParts();
+  renderCats();
+  renderRules();
+  renderFields();
+  renderSettings();
+  renderTesterBuild();
+}
+
+function showPane(btn, id) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById('pane-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'leads') loadLeads();
+  if (id === 'tenders-list') loadTenders();
+}
+
+function fmt(n, currency) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: currency || 'INR', maximumFractionDigits: 2 }).format(n);
+}
+
+// ---- PARTS ----
+const PART_FIELDS = [
+  { id: 'id', label: 'ID (slug)', placeholder: 'cpu-xeon-4210' },
+  { id: 'category_id', label: 'Category', type: 'select' },
+  { id: 'name', label: 'Name' },
+  { id: 'specs', label: 'Specs' },
+  { id: 'price', label: 'Landed cost', type: 'number', placeholder: '0.00' },
+  { id: 'stock_qty', label: 'Stock qty', type: 'number', placeholder: '0' },
+  { id: 'lead_days', label: 'Lead days (0 = unknown)', type: 'number', placeholder: '0' },
+  { id: 'active', label: 'Active', type: 'select', options: [['1','Yes'],['0','No (retired)']] },
+  { id: 'attrs', label: 'Attrs (JSON)', placeholder: '{"socket":"LGA3647","tdp":85}', wide: true },
+];
+
+function showPartForm(opt) {
+  editingPartId = opt?.id || null;
+  const wrap = document.getElementById('part-form-wrap');
+  const container = document.getElementById('part-form-fields');
+  container.innerHTML = '';
+  for (const f of PART_FIELDS) {
+    const grp = document.createElement('div');
+    grp.className = 'form-group' + (f.wide ? '" style="grid-column:1/-1' : '');
+    grp.innerHTML = `<label>${f.label}</label>`;
+    if (f.type === 'select') {
+      const sel = document.createElement('select');
+      sel.id = 'pf-' + f.id;
+      if (f.id === 'category_id') {
+        for (const c of adminData.categories) sel.innerHTML += `<option value="${c.id}" ${opt?.category_id===c.id?'selected':''}>${c.label}</option>`;
+      } else {
+        for (const [v, l] of (f.options || [])) sel.innerHTML += `<option value="${v}" ${String(opt?.[f.id])===v?'selected':''}>${l}</option>`;
+      }
+      grp.appendChild(sel);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = f.type || 'text'; inp.id = 'pf-' + f.id;
+      inp.placeholder = f.placeholder || '';
+      if (opt) inp.value = f.id === 'attrs' ? (typeof opt.attrs === 'string' ? opt.attrs : JSON.stringify(opt.attrs || {})) : (opt[f.id] ?? '');
+      if (f.id === 'id' && editingPartId) inp.readOnly = true;
+      grp.appendChild(inp);
+    }
+    container.appendChild(grp);
+  }
+  wrap.classList.remove('hidden');
+  document.getElementById('pf-id').focus();
+}
+
+function closePartForm() {
+  document.getElementById('part-form-wrap').classList.add('hidden');
+  editingPartId = null;
+}
+
+async function savePart() {
+  const body = {};
+  for (const f of PART_FIELDS) {
+    const el = document.getElementById('pf-' + f.id);
+    body[f.id] = el ? el.value : '';
+  }
+  const msg = document.getElementById('form-msg');
+  msg.style.color = 'var(--ink-3)'; msg.textContent = 'Saving…';
+  const res = await api('/api/admin/options', { method: 'POST', body: JSON.stringify(body) });
+  const r = await res.json();
+  if (res.ok) {
+    msg.style.color = 'var(--signal)'; msg.textContent = 'Saved.';
+    await loadAll();
+  } else {
+    msg.style.color = 'var(--stop)'; msg.textContent = r.error;
+  }
+}
+
+function renderParts() {
+  if (!adminData) return;
+  const showInactive = document.getElementById('show-inactive')?.checked;
+  const parts = adminData.options.filter(o => showInactive || Number(o.active) !== 0);
+  document.getElementById('parts-count').textContent = parts.length + ' parts';
+  const tbody = document.getElementById('parts-tbody');
+  const catMap = Object.fromEntries(adminData.categories.map(c => [c.id, c]));
+  const s = adminData.settings;
+  const defMargin = Number(s.default_margin_pct || 0);
+  tbody.innerHTML = '';
+  for (const o of parts) {
+    const cat = catMap[o.category_id];
+    const margin = cat?.margin_pct != null ? Number(cat.margin_pct) : defMargin;
+    const sell = margin < 95 ? o.price / (1 - margin / 100) : o.price;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono" style="font-size:11px;color:var(--ink-3)">${o.id}</td>
+      <td><strong style="font-size:13px">${o.name}</strong>${o.specs ? `<br><span class="text-ink3" style="font-size:11px">${o.specs}</span>` : ''}</td>
+      <td class="silk">${o.category_id}</td>
+      <td class="num" style="color:var(--stop)">${fmt(o.price)}</td>
+      <td class="num" style="color:var(--trace)">${fmt(Math.round(sell * 100)/100)}</td>
+      <td class="num">${o.stock_qty}</td>
+      <td class="num">${o.lead_days || '—'}</td>
+      <td>${Number(o.active) ? '<span class="tag tag-signal">Active</span>' : '<span class="tag tag-dim">Retired</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn" style="padding:4px 8px;font-size:10px" onclick='showPartForm(${JSON.stringify(o)})'>Edit</button>
+        ${Number(o.active) ? `<button class="btn btn-stop" style="padding:4px 8px;font-size:10px;margin-left:4px" onclick="retirePart('${o.id}')">Retire</button>` : ''}
+      </td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function retirePart(id) {
+  if (!confirm(`Retire "${id}"? It will no longer appear in the configurator.`)) return;
+  await api('/api/admin/options/' + id, { method: 'DELETE' });
+  await loadAll();
+}
+
+// ---- CATEGORIES ----
+function showCatForm(cat) {
+  editingCatId = cat?.id || null;
+  if (cat) {
+    document.getElementById('cf-id').value = cat.id;
+    document.getElementById('cf-label').value = cat.label;
+    document.getElementById('cf-note').value = cat.note || '';
+    document.getElementById('cf-sort').value = cat.sort;
+    document.getElementById('cf-required').value = cat.required;
+    document.getElementById('cf-max-qty').value = cat.max_qty;
+    document.getElementById('cf-multi').value = cat.multi;
+    document.getElementById('cf-margin').value = cat.margin_pct ?? '';
+    document.getElementById('cf-active').value = cat.active;
+  }
+  document.getElementById('cat-form-wrap').classList.remove('hidden');
+}
+
+async function saveCat() {
+  const body = {
+    id: document.getElementById('cf-id').value.trim(),
+    label: document.getElementById('cf-label').value.trim(),
+    note: document.getElementById('cf-note').value.trim(),
+    sort: document.getElementById('cf-sort').value,
+    required: document.getElementById('cf-required').value,
+    max_qty: document.getElementById('cf-max-qty').value,
+    multi: document.getElementById('cf-multi').value,
+    margin_pct: document.getElementById('cf-margin').value.trim() || null,
+    active: document.getElementById('cf-active').value,
+  };
+  const msg = document.getElementById('cat-form-msg');
+  const res = await api('/api/admin/categories', { method: 'POST', body: JSON.stringify(body) });
+  const r = await res.json();
+  if (res.ok) { msg.style.color = 'var(--signal)'; msg.textContent = 'Saved.'; await loadAll(); }
+  else { msg.style.color = 'var(--stop)'; msg.textContent = r.error; }
+}
+
+function renderCats() {
+  if (!adminData) return;
+  const tbody = document.getElementById('cats-tbody');
+  tbody.innerHTML = '';
+  for (const c of adminData.categories) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono" style="font-size:11px">${c.id}</td>
+      <td><strong>${c.label}</strong></td>
+      <td>${Number(c.required) ? '<span class="tag tag-alert">Yes</span>' : '—'}</td>
+      <td>${Number(c.multi) ? '<span class="tag tag-dim">Yes</span>' : '—'}</td>
+      <td class="num">${c.margin_pct != null ? c.margin_pct + '%' : '<span class="text-ink3">default</span>'}</td>
+      <td>${Number(c.active) ? '<span class="tag tag-signal">Yes</span>' : '<span class="tag tag-dim">No</span>'}</td>
+      <td><button class="btn" style="padding:4px 8px;font-size:10px" onclick='showCatForm(${JSON.stringify(c)})'>Edit</button></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+// ---- RULES ----
+function showRuleForm(rule) {
+  editingRuleId = rule?.id || null;
+  const fields = { name: '', message: '', severity: 'block', left_kind: '', left_cats: '', left_attr: '', left_scale: '', left_offset: '', op: '', right_kind: '', right_cats: '', right_attr: '', right_const: '', enabled: 1, sort: 0 };
+  if (rule) Object.assign(fields, rule);
+  document.getElementById('rf-name').value = fields.name;
+  document.getElementById('rf-message').value = fields.message;
+  document.getElementById('rf-severity').value = fields.severity;
+  document.getElementById('rf-lk').value = fields.left_kind || '';
+  document.getElementById('rf-lc').value = fields.left_cats || '';
+  document.getElementById('rf-la').value = fields.left_attr || '';
+  document.getElementById('rf-ls').value = fields.left_scale ?? '';
+  document.getElementById('rf-lo').value = fields.left_offset ?? '';
+  document.getElementById('rf-op').value = fields.op || '';
+  document.getElementById('rf-rk').value = fields.right_kind || '';
+  document.getElementById('rf-rc').value = fields.right_cats || '';
+  document.getElementById('rf-ra').value = fields.right_attr || '';
+  document.getElementById('rf-rv').value = fields.right_const ?? '';
+  document.getElementById('rf-en').value = fields.enabled;
+  document.getElementById('rf-sort').value = fields.sort;
+  document.getElementById('rule-form-wrap').classList.remove('hidden');
+}
+
+function closeRuleForm() {
+  editingRuleId = null;
+  document.getElementById('rule-form-wrap').classList.add('hidden');
+}
+
+async function saveRule() {
+  const body = {
+    id: editingRuleId || undefined,
+    name: document.getElementById('rf-name').value.trim(),
+    message: document.getElementById('rf-message').value.trim(),
+    severity: document.getElementById('rf-severity').value,
+    left_kind: document.getElementById('rf-lk').value,
+    left_cats: document.getElementById('rf-lc').value,
+    left_attr: document.getElementById('rf-la').value,
+    left_scale: document.getElementById('rf-ls').value || null,
+    left_offset: document.getElementById('rf-lo').value || null,
+    op: document.getElementById('rf-op').value,
+    right_kind: document.getElementById('rf-rk').value,
+    right_cats: document.getElementById('rf-rc').value,
+    right_attr: document.getElementById('rf-ra').value,
+    right_const: document.getElementById('rf-rv').value || null,
+    enabled: document.getElementById('rf-en').value,
+    sort: document.getElementById('rf-sort').value,
+  };
+  const msg = document.getElementById('rule-form-msg');
+  const res = await api('/api/admin/rules', { method: 'POST', body: JSON.stringify(body) });
+  const r = await res.json();
+  if (res.ok) { msg.style.color = 'var(--signal)'; msg.textContent = 'Saved.'; await loadAll(); closeRuleForm(); }
+  else { msg.style.color = 'var(--stop)'; msg.textContent = r.error; }
+}
+
+async function deleteRule(id) {
+  if (!confirm('Delete rule ' + id + '?')) return;
+  await api('/api/admin/rules/' + id, { method: 'DELETE' });
+  await loadAll();
+}
+
+async function loadStarterPack() {
+  const res = await api('/api/admin/rules/starter-pack', { method: 'POST' });
+  const r = await res.json();
+  alert(`Added ${r.added} rule(s), skipped ${r.skipped} (already present).`);
+  await loadAll();
+}
+
+function renderRules() {
+  if (!adminData) return;
+  const container = document.getElementById('rules-list');
+  container.innerHTML = '';
+  if (!adminData.rules.length) {
+    container.innerHTML = '<div class="text-ink3" style="font-size:13px;padding:16px">No rules yet. Add one above or load the starter pack.</div>';
+    return;
+  }
+  for (const rule of adminData.rules) {
+    const card = document.createElement('div');
+    card.className = 'rule-card';
+    card.innerHTML = `
+      <div class="rule-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="led ${Number(rule.enabled) ? (rule.severity === 'block' ? 'stop' : 'warn') : ''}"></span>
+        <span style="font-weight:600;font-size:13px">${rule.name}</span>
+        <span class="tag ${rule.severity==='block'?'tag-stop':'tag-alert'}" style="margin-left:4px">${rule.severity}</span>
+        ${!Number(rule.enabled) ? '<span class="tag tag-dim">Disabled</span>' : ''}
+        <span class="ml-auto flex gap-8">
+          <button class="btn" style="padding:3px 8px;font-size:10px" onclick="event.stopPropagation();showRuleForm(${JSON.stringify(rule).replace(/'/g,"\\'")})" >Edit</button>
+          <button class="btn btn-stop" style="padding:3px 8px;font-size:10px" onclick="event.stopPropagation();deleteRule(${rule.id})">Delete</button>
+        </span>
+      </div>
+      <div class="rule-card-body">
+        <div style="font-size:12px;color:var(--ink-2);margin-bottom:8px">"${rule.message}"</div>
+        <div class="result-detail">${rule.left_kind||''} ${rule.left_cats||''} ${rule.left_attr||''} ${rule.left_scale?'×'+rule.left_scale:''} ${rule.left_offset?'+'+rule.left_offset:''} <strong style="color:var(--trace);margin:0 6px">${rule.op||''}</strong> ${rule.right_kind||''} ${rule.right_cats||''} ${rule.right_attr||''} ${rule.right_const||''}</div>
+      </div>`;
+    container.appendChild(card);
+  }
+}
+
+// ---- RULE TESTER ----
+let testerSelection = {};
+
+function renderTesterBuild() {
+  if (!adminData) return;
+  const container = document.getElementById('tester-build');
+  container.innerHTML = '';
+  for (const cat of adminData.categories) {
+    const opts = adminData.options.filter(o => o.category_id === cat.id);
+    if (!opts.length) continue;
+    const row = document.createElement('div');
+    row.className = 'option-row';
+    row.innerHTML = `<label class="silk" style="min-width:110px">${cat.label}</label>`;
+    const sel = document.createElement('select');
+    sel.style.cssText = 'width:280px';
+    sel.innerHTML = '<option value="">— not selected —</option>';
+    for (const o of opts) sel.innerHTML += `<option value="${o.id}">${o.name}</option>`;
+    if (testerSelection[cat.id]) sel.value = testerSelection[cat.id];
+    sel.addEventListener('change', e => { testerSelection[cat.id] = e.target.value; });
+    row.appendChild(sel);
+    container.appendChild(row);
+  }
+}
+
+async function runTest() {
+  const selection = Object.entries(testerSelection).filter(([,v]) => v).map(([,id]) => ({ option_id: id }));
+  const res = await api('/api/admin/rules/test', { method: 'POST', body: JSON.stringify({ selection }) });
+  const r = await res.json();
+  document.getElementById('test-results-panel').style.display = '';
+  const blocks = r.results.filter(x => x.applied && !x.passed && x.severity === 'block').length;
+  const warns = r.results.filter(x => x.applied && !x.passed && x.severity === 'warn').length;
+  document.getElementById('test-summary').textContent = `${blocks} blocks · ${warns} warnings · ${r.results.filter(x=>x.applied).length} applied`;
+  const container = document.getElementById('tester-results');
+  container.innerHTML = '';
+  for (const result of r.results) {
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    let icon = '<span class="tag tag-dim">SKIP</span>';
+    if (result.applied) icon = result.passed ? '<span class="tag tag-signal">PASS</span>' : (result.severity === 'block' ? '<span class="tag tag-stop">FAIL</span>' : '<span class="tag tag-alert">WARN</span>');
+    row.innerHTML = `${icon} <span style="font-weight:500;font-size:12px">${result.name}</span>
+      ${result.detail ? `<span class="result-detail">${result.detail}</span>` : ''}
+      ${result.skipped_reason ? `<span class="text-ink3" style="font-size:11px">(${result.skipped_reason})</span>` : ''}
+      ${!result.passed && result.applied ? `<span class="text-ink2" style="font-size:11px">${result.message}</span>` : ''}`;
+    container.appendChild(row);
+  }
+}
+
+// ---- FIELDS ----
+function renderFields() {
+  if (!adminData) return;
+  const tbody = document.getElementById('fields-tbody');
+  tbody.innerHTML = '';
+  for (const f of adminData.extraction_fields) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="mono" style="font-size:11px">${f.key}</td><td>${f.label}</td><td class="silk">${f.group_name}</td><td class="silk">${f.type}</td><td class="text-ink3" style="font-size:12px">${f.hint || ''}</td><td>${Number(f.active) ? '<span class="tag tag-signal">Yes</span>' : '<span class="tag tag-dim">No</span>'}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+// ---- SETTINGS ----
+function renderSettings() {
+  if (!adminData) return;
+  const container = document.getElementById('settings-form');
+  container.innerHTML = '';
+  for (const [k, v] of Object.entries(adminData.settings)) {
+    container.innerHTML += `
+      <label class="silk silk-sm" for="s-${k}">${k}</label>
+      <input id="s-${k}" value="${v ?? ''}" ${k.includes('key') ? 'type="password"' : ''}>`;
+  }
+}
+
+async function saveSettings() {
+  const body = {};
+  for (const k of Object.keys(adminData.settings)) {
+    const el = document.getElementById('s-' + k);
+    if (el) body[k] = el.value;
+  }
+  const res = await api('/api/admin/settings', { method: 'POST', body: JSON.stringify(body) });
+  const msg = document.getElementById('settings-msg');
+  if (res.ok) { msg.style.color = 'var(--signal)'; msg.textContent = 'Saved.'; await loadAll(); }
+  else { const r = await res.json(); msg.style.color = 'var(--stop)'; msg.textContent = r.error; }
+}
+
+// ---- EXCEL ----
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('excel-file');
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) doImport(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) doImport(fileInput.files[0]); });
+
+async function doImport(file) {
+  const msg = document.getElementById('import-msg');
+  msg.style.color = 'var(--ink-3)'; msg.textContent = `Uploading ${file.name}…`;
+  const form = new FormData(); form.append('file', file);
+  const res = await fetch('/api/admin/import', { method: 'POST', headers: { 'x-admin-token': T }, body: form });
+  const r = await res.json();
+  if (res.ok) {
+    const a = r.applied;
+    msg.style.color = 'var(--signal)';
+    msg.textContent = `Import successful — ${a.categories} categories, ${a.options} options, ${a.rules} rules, ${a.settings} settings updated.`;
+    await loadAll();
+  } else {
+    msg.style.color = 'var(--stop)';
+    msg.textContent = r.error + '\n' + (r.details || []).join('\n');
+  }
+}
+
+// ---- LEADS / TENDERS ----
+async function loadLeads() {
+  const res = await api('/api/admin/leads');
+  const leads = await res.json();
+  document.getElementById('leads-count').textContent = leads.length;
+  const tbody = document.getElementById('leads-tbody');
+  const s = adminData?.settings || {};
+  tbody.innerHTML = '';
+  for (const l of leads) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="mono">${l.ref}</td><td>${l.name || '—'}</td><td>${l.company || '—'}</td><td>${l.mobile || '—'}</td><td>${l.city || '—'}</td><td class="num">${l.units}</td><td class="num text-trace">${fmt(l.total)}</td><td class="text-ink3" style="font-size:12px">${l.created_at?.slice(0,16) || ''}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function loadTenders() {
+  const res = await api('/api/admin/tenders');
+  const tenders = await res.json();
+  const tbody = document.getElementById('tenders-tbody');
+  tbody.innerHTML = '';
+  for (const t of tenders) {
+    const stCol = { done: 'tag-signal', error: 'tag-stop', processing: 'tag-alert', queued: 'tag-dim' }[t.status] || 'tag-dim';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="mono">${t.ref}</td><td>${t.filename || '—'}</td><td class="num">${t.pages || '—'}</td><td><span class="tag ${stCol}">${t.status}</span>${t.error ? `<br><span class="text-stop" style="font-size:11px">${t.error.slice(0,80)}</span>` : ''}</td><td class="text-ink3" style="font-size:12px">${t.created_at?.slice(0,16) || ''}</td><td>${t.status==='done' ? `<a class="btn" style="padding:3px 8px;font-size:10px" href="/tender?id=${t.id}">View</a>` : ''}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+loadAll();
+</script>
+</body>
+</html>
