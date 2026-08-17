@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: panache-configurator
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: UPLOAD_MODE
+        value: disk          # Render has a real filesystem and no body cap
+      - key: AI_PROVIDER
+        value: gemini
+      - key: DATABASE_URL
+        sync: false          # Neon POOLED connection string
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

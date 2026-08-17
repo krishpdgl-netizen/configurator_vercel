@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Staff access</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  .wrap { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+  .card { width: min(420px, 100%); }
+  .mark { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .mark h1 { font-size: 17px; letter-spacing: 0.02em; }
+  label { display: block; margin-bottom: 6px; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+  #msg { font-size: 13px; color: var(--stop); min-height: 18px; margin-top: 10px; font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="mark"><span class="via"></span><h1>Panache DigiLife</h1></div>
+    <section class="panel">
+      <header><span class="silk">Staff access</span></header>
+      <div class="body">
+        <label class="silk" for="token">Access token</label>
+        <input id="token" type="password" autocomplete="current-password" spellcheck="false">
+        <div class="row">
+          <button class="primary" id="go">Sign in</button>
+          <span class="silk">Admin &amp; tender desk</span>
+        </div>
+        <p id="msg" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+    <p class="silk" style="margin-top:14px"><a href="/">← Back to the configurator</a></p>
+  </div>
+</div>
+<script>
+  const params = new URLSearchParams(location.search);
+  const next = params.get('next') || '/admin';
+  const msg = document.getElementById('msg');
+  const input = document.getElementById('token');
+
+  async function signIn() {
+    msg.textContent = '';
+    const token = input.value.trim();
+    if (!token) { msg.textContent = 'Enter the access token.'; return; }
+    const res = await fetch('/api/admin/whoami', { headers: { 'x-admin-token': token } });
+    if (res.ok) {
+      document.cookie = 'admin_token=' + encodeURIComponent(token) + '; path=/; max-age=43200; samesite=lax';
+      location.href = next;
+      return;
+    }
+    const body = await res.json().catch(() => ({}));
+    msg.textContent = body.error || 'That token was not accepted.';
+  }
+
+  document.getElementById('go').addEventListener('click', signIn);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') signIn(); });
+  input.focus();
+</script>
+</body>
+</html>
