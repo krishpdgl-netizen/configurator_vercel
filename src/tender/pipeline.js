@@ -33,17 +33,36 @@ async function extractText(buffer, filename) {
 
 async function extractPdf(buffer) {
   const pdfParse = require('pdf-parse');
-  if (typeof pdfParse !== 'function') {
-    throw new Error(
-      'pdf-parse v2 is not supported in serverless environments (DOMMatrix missing). ' +
-      'Pin pdf-parse to 1.1.1 in package.json.'
-    );
+  // pdf-parse v2 exports a PDFParse class; v1 exports a callable function.
+  // Support both.
+  let pages = [];
+  let totalText = '';
+  try {
+    if (typeof pdfParse === 'function') {
+      // v1 API
+      const result = await pdfParse(buffer);
+      totalText = result.text;
+      pages = [{ page: 1, text: totalText }];
+    } else if (pdfParse.PDFParse) {
+      // v2 API
+      const parser = new pdfParse.PDFParse();
+      const result = await parser.parseBuffer(buffer, {
+        pagerender: (pageData) => {
+          return pageData.getTextContent().then((tc) => {
+            const text = tc.items.map((i) => i.str).join(' ');
+            pages.push({ page: pages.length + 1, text });
+            return text;
+          });
+        },
+      });
+      totalText = pages.map((p) => `[PAGE ${p.page}]\n${p.text}`).join('\n\n');
+    }
+  } catch (err) {
+    throw new Error(`PDF extraction failed: ${err.message}`);
   }
-  const result = await pdfParse(buffer);
-  const text = result.text || '';
-  // v1 gives us all text as one string — split into rough page chunks
-  const pages = [{ page: 1, text }];
-  return { pages, totalText: text, pageCount: result.numpages || 1 };
+
+  if (!pages.length) pages = [{ page: 1, text: totalText }];
+  return { pages, totalText, pageCount: pages.length };
 }
 
 async function extractDocx(buffer) {
@@ -151,25 +170,44 @@ async function extractTechnical(textContext) {
  * - If no legal combination exists, report the conflict rather than silence it.
  */
 async function matchItem(item, cats, opts, rules, deliveryDays) {
-  // Step 1: which categories does this item's requirements touch?
+  // Step 1: find categories genuinely matching this item's requirements or description.
+  //
+  // CRITICAL: an option must ACTUALLY satisfy a requirement attribute or match
+  // the item description — not just 'have no conflicting attrs'. Without this
+  // check, items with no requirements (Printer, UPS) match every category because
+  // every option trivially passes an empty requirement set, triggering back-fill
+  // of every required category and producing phantom server builds.
   const reqKeys = Object.keys(item.requirements || {});
+  const descWords = (item.description || '').toLowerCase().split(/W+/).filter(w => w.length > 3);
 
   const candidatesByCategory = new Map();
+  const genuineMatchCats = new Set();
+
   for (const cat of cats.filter((c) => Number(c.active) === 1)) {
     const catOpts = opts.filter((o) => o.category_id === cat.id && Number(o.active) === 1);
     const matching = catOpts.filter((o) => {
       const attrs = typeof o.attrs === 'string' ? JSON.parse(o.attrs || '{}') : (o.attrs || {});
-      return reqKeys.every((key) => {
-        if (attrs[key] === undefined) return true; // option doesn't carry this attr — don't exclude it
-        const need = String(item.requirements[key]).toLowerCase().replace(/\s/g, '');
-        const have = String(attrs[key]).toLowerCase().replace(/\s/g, '');
-        return have.includes(need) || need.includes(have);
-      });
+      let attrMatchCount = 0;
+      let attrFailCount = 0;
+      for (const key of reqKeys) {
+        if (attrs[key] === undefined) continue;
+        const need = String(item.requirements[key]).toLowerCase().replace(/s/g, '');
+        const have = String(attrs[key]).toLowerCase().replace(/s/g, '');
+        if (have.includes(need) || need.includes(have)) attrMatchCount++;
+        else attrFailCount++;
+      }
+      if (attrFailCount > 0) return false;
+      if (attrMatchCount > 0) { genuineMatchCats.add(cat.id); return true; }
+      // No requirement attrs on this option — fall back to description keyword match.
+      const combined = ((o.name || '') + ' ' + (cat.label || '')).toLowerCase();
+      if (descWords.some(w => combined.includes(w))) { genuineMatchCats.add(cat.id); return true; }
+      return false;
     });
     if (matching.length) candidatesByCategory.set(cat.id, matching);
   }
 
-  if (!candidatesByCategory.size) return { matched: false, description: item.description };
+  // If nothing genuinely matched, this item is not in the catalog. Do not back-fill.
+  if (!genuineMatchCats.size) return { matched: false, description: item.description };
 
   // Step 2: back-fill required categories not already covered
   const requiredCats = cats.filter((c) => Number(c.required) === 1 && Number(c.active) === 1);
