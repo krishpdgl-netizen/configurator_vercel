@@ -33,36 +33,17 @@ async function extractText(buffer, filename) {
 
 async function extractPdf(buffer) {
   const pdfParse = require('pdf-parse');
-  // pdf-parse v2 exports a PDFParse class; v1 exports a callable function.
-  // Support both.
-  let pages = [];
-  let totalText = '';
-  try {
-    if (typeof pdfParse === 'function') {
-      // v1 API
-      const result = await pdfParse(buffer);
-      totalText = result.text;
-      pages = [{ page: 1, text: totalText }];
-    } else if (pdfParse.PDFParse) {
-      // v2 API
-      const parser = new pdfParse.PDFParse();
-      const result = await parser.parseBuffer(buffer, {
-        pagerender: (pageData) => {
-          return pageData.getTextContent().then((tc) => {
-            const text = tc.items.map((i) => i.str).join(' ');
-            pages.push({ page: pages.length + 1, text });
-            return text;
-          });
-        },
-      });
-      totalText = pages.map((p) => `[PAGE ${p.page}]\n${p.text}`).join('\n\n');
-    }
-  } catch (err) {
-    throw new Error(`PDF extraction failed: ${err.message}`);
+  if (typeof pdfParse !== 'function') {
+    throw new Error(
+      'pdf-parse v2 is not supported in serverless environments (DOMMatrix missing). ' +
+      'Pin pdf-parse to 1.1.1 in package.json.'
+    );
   }
-
-  if (!pages.length) pages = [{ page: 1, text: totalText }];
-  return { pages, totalText, pageCount: pages.length };
+  const result = await pdfParse(buffer);
+  const text = result.text || '';
+  // v1 gives us all text as one string — split into rough page chunks
+  const pages = [{ page: 1, text }];
+  return { pages, totalText: text, pageCount: result.numpages || 1 };
 }
 
 async function extractDocx(buffer) {
