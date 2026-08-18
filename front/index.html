@@ -253,8 +253,9 @@ async function load() {
   const res = await fetch('/api/catalog');
   catalog = await res.json();
   rules = catalog.rules || [];
-  fmt = new Intl.NumberFormat(catalog.settings.locale || 'en-IN', { style: 'currency', currency: catalog.settings.currency || 'INR', maximumFractionDigits: 2 });
-  document.getElementById('loading').remove();
+const currencyCode = (catalog.settings.currency || 'INR').trim();
+const safeCurrency = /^[A-Z]{3}$/.test(currencyCode) ? currencyCode : 'INR';
+fmt = new Intl.NumberFormat(catalog.settings.locale || 'en-IN', { style: 'currency', currency: safeCurrency, maximumFractionDigits: 2 });  document.getElementById('loading').remove();
   render();
 }
 
