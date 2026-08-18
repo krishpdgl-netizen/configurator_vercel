@@ -73,7 +73,7 @@ app.get('/healthz', async (req, res) => {
 });
 
 // --- pages ------------------------------------------------------------------
-const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+const PUBLIC_DIR = path.join(__dirname, '..', 'front');
 const page = (file) => (req, res) => res.sendFile(path.join(PUBLIC_DIR, file));
 
 app.get('/admin', admin, page('admin.html'));
