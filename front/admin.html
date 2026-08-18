@@ -733,11 +733,106 @@ async function loadLeads() {
   const s = adminData?.settings || {};
   tbody.innerHTML = '';
   for (const l of leads) {
+    // Main row
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td class="mono">${l.ref}</td><td>${l.name || '—'}</td><td>${l.company || '—'}</td><td>${l.mobile || '—'}</td><td>${l.city || '—'}</td><td class="num">${l.units}</td><td class="num text-trace">${fmt(l.total)}</td><td class="text-ink3" style="font-size:12px">${l.created_at?.slice(0,16) || ''}</td>`;
+    tr.style.cursor = 'pointer';
+    tr.innerHTML = `
+      <td class="mono">${l.ref}</td>
+      <td><strong>${l.name || '—'}</strong></td>
+      <td>${l.company || '—'}</td>
+      <td>${l.mobile || '—'}</td>
+      <td>${l.city || '—'}</td>
+      <td class="num">${l.units}</td>
+      <td class="num text-trace">${fmt(l.total)}</td>
+      <td class="text-ink3" style="font-size:12px">${l.created_at?.slice(0,16) || ''}</td>
+      <td><span class="silk" style="font-size:9px;color:var(--ink-3)">▶ Details</span></td>`;
+
+    // Detail row (hidden by default)
+    const detail = document.createElement('tr');
+    detail.style.display = 'none';
+    detail.innerHTML = `<td colspan="9" style="padding:0"></td>`;
+
+    let built = false;
+    tr.addEventListener('click', () => {
+      const isOpen = detail.style.display !== 'none';
+      // Close all other detail rows
+      tbody.querySelectorAll('tr[data-detail]').forEach(r => r.style.display = 'none');
+      tbody.querySelectorAll('tr[data-summary] td:last-child span').forEach(s => s.textContent = '▶ Details');
+      if (isOpen) return;
+
+      tr.querySelector('td:last-child span').textContent = '▼ Details';
+      detail.style.display = '';
+
+      if (!built) {
+        built = true;
+        const items = JSON.parse(l.config_json || '[]');
+        const subtotal = fmt(l.subtotal);
+        const tax = fmt(l.tax);
+        const total = fmt(l.total);
+        const notes = l.notes ? `<div style="margin-bottom:10px;font-size:12px;color:var(--ink-2)"><span class="silk silk-sm">Notes:</span> ${l.notes}</div>` : '';
+        let rows = '';
+        for (const item of items) {
+          rows += `<tr>
+            <td class="silk" style="font-size:10px">${item.category_id || ''}</td>
+            <td style="font-size:12px;font-weight:500">${item.name}</td>
+            <td class="num" style="font-size:12px">${item.qty}</td>
+            <td class="num text-trace" style="font-size:12px">${fmt(item.unit_price)}</td>
+            <td class="num" style="font-size:12px">${fmt(item.line_total)}</td>
+            <td style="font-size:11px;color:var(--ink-3)">${item.in_stock === false ? '<span class="text-alert">On order</span>' : item.stock_qty + ' in stock'}</td>
+          </tr>`;
+        }
+        detail.querySelector('td').innerHTML = `
+          <div style="padding:16px 20px;background:var(--void);border-top:var(--hair);border-bottom:var(--hair)">
+            <div style="display:flex;gap:32px;margin-bottom:14px;flex-wrap:wrap">
+              <div><div class="silk silk-sm mb-8">Contact</div>
+                <div style="font-size:13px">${l.name || '—'}</div>
+                <div style="font-size:12px;color:var(--ink-2)">${l.company || ''}</div>
+                <div style="font-size:12px;color:var(--ink-2)">${l.mobile || ''} ${l.email || ''}</div>
+                <div style="font-size:12px;color:var(--ink-3)">${l.city || ''}</div>
+              </div>
+              <div><div class="silk silk-sm mb-8">Order</div>
+                <div style="font-size:12px;color:var(--ink-2)">Units: <strong style="color:var(--ink)">${l.units}</strong></div>
+                <div style="font-size:12px;color:var(--ink-2)">Ref: <span class="mono">${l.ref}</span></div>
+                <div style="font-size:12px;color:var(--ink-3)">${l.created_at?.slice(0,16) || ''}</div>
+              </div>
+            </div>
+            ${notes}
+            <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px">
+              <thead><tr>
+                <th style="font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);padding:6px 8px;border-bottom:var(--hair);text-align:left">Category</th>
+                <th style="font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);padding:6px 8px;border-bottom:var(--hair);text-align:left">Part</th>
+                <th style="font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);padding:6px 8px;border-bottom:var(--hair);text-align:right">Qty</th>
+                <th style="font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);padding:6px 8px;border-bottom:var(--hair);text-align:right">Unit price</th>
+                <th style="font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);padding:6px 8px;border-bottom:var(--hair);text-align:right">Line total</th>
+                <th style="font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);padding:6px 8px;border-bottom:var(--hair);text-align:left">Stock</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+            <div style="display:flex;justify-content:flex-end;gap:24px;padding-top:10px;border-top:var(--hair)">
+              <div style="text-align:right">
+                <div style="font-size:11px;color:var(--ink-3);font-family:var(--f-mono)">SUBTOTAL</div>
+                <div style="font-family:var(--f-mono);font-size:13px">${subtotal}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:11px;color:var(--ink-3);font-family:var(--f-mono)">${s.tax_label || 'TAX'}</div>
+                <div style="font-family:var(--f-mono);font-size:13px">${tax}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:11px;color:var(--ink-3);font-family:var(--f-mono)">TOTAL</div>
+                <div style="font-family:var(--f-mono);font-size:18px;font-weight:700;color:var(--trace)">${total}</div>
+              </div>
+            </div>
+          </div>`;
+      }
+    });
+
+    tr.setAttribute('data-summary', '1');
+    detail.setAttribute('data-detail', '1');
     tbody.appendChild(tr);
+    tbody.appendChild(detail);
   }
 }
+
 
 async function loadTenders() {
   const res = await api('/api/admin/tenders');
